@@ -1,6 +1,6 @@
 // Server
 
-type StateName = "discovery" | "preturn" | "duringturn"
+type StateName = "discovery" | "preturn" | "duringturn" | "endgame"
 interface GameState {
     name: StateName;
     onMessage: (messageType: string, id: string, data: string) => void;
@@ -18,7 +18,8 @@ interface RegisteredPlayer {
 interface GameData {
     currentState: GameState | undefined;
     registeredPlayers: RegisteredPlayer[];
-    player1: boolean
+    player1: boolean;
+    winner?: string;
 }
 
 const messagePrefix = "BS"
@@ -26,10 +27,38 @@ const messagePrefix = "BS"
 const gameData: GameData = {
     currentState: undefined,
     registeredPlayers: [],
-    player1: true
+    player1: true,
 }
 
 const stateMap = {} as any;
+
+const endGameState: GameState = {
+    name: "endgame",
+    onMessage: (messageType, id, data) => {
+        
+    },
+    onUpdate: () => {
+        radio.sendString(messagePrefix + "E:" + gameData.winner);
+
+        basic.showNumber(gameData.registeredPlayers.length);
+        led.point
+        led.plot(0, 0);
+        led.plot(4, 4);
+        led.plot(0, 4);
+        led.plot(4, 0);
+
+        radio.sendString(messagePrefix + "E:" + gameData.winner);
+
+        basic.showNumber(gameData.registeredPlayers.length);
+        led.plot(1, 1);
+        led.plot(3, 3);
+        led.plot(1, 3);
+        led.plot(3, 1);
+
+        radio.sendString(messagePrefix + "E:" + gameData.winner);
+    }
+}
+stateMap[endGameState.name] = endGameState;
 
 const duringturnState: GameState = {
     name: "duringturn",
@@ -42,9 +71,8 @@ const duringturnState: GameState = {
             const y = parseInt(data.charAt(1));
 
             if (x === otherPlayer.shipLocation.x && y === otherPlayer.shipLocation.y) {
-                radio.sendString(messagePrefix + "E:" + id);
-                gameData.registeredPlayers = [];
-                gameData.currentState = stateMap["discovery"];
+                gameData.winner = currentPlayer.id;
+                gameData.currentState = stateMap["endgame"];
             } else {
                 gameData.player1 = !gameData.player1;
                 gameData.currentState = stateMap["preturn"];
@@ -123,4 +151,14 @@ gameData.currentState = discoveryState
 
 basic.forever(function () {
 	gameData.currentState.onUpdate();
+})
+
+input.onButtonPressed(Button.AB, () => {
+    if (gameData.currentState.name !== "endgame") {
+        return;
+    }
+
+    gameData.registeredPlayers = [];
+    gameData.winner = undefined;
+    gameData.currentState = stateMap["discovery"];
 })
